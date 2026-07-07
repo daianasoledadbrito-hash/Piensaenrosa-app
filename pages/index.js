@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import Head from "next/head";
 
 /* ---------------------------------------------------------
    PIENSA EN ROSA — Prototipo de flujo de reserva (Clienta)
@@ -523,6 +524,54 @@ export default function PiensaEnRosaReserva() {
   const [errorGuardado, setErrorGuardado] = useState("");
   const [enviando, setEnviando] = useState(false);
 
+  // --- Instalar como app (PWA) ---
+  const [promptInstalacion, setPromptInstalacion] = useState(null);
+  const [mostrarInstruccionesIOS, setMostrarInstruccionesIOS] = useState(false);
+
+  useEffect(() => {
+    function alListo(e) {
+      e.preventDefault();
+      setPromptInstalacion(e);
+    }
+    window.addEventListener("beforeinstallprompt", alListo);
+    return () => window.removeEventListener("beforeinstallprompt", alListo);
+  }, []);
+
+  async function instalarApp() {
+    if (promptInstalacion) {
+      promptInstalacion.prompt();
+      await promptInstalacion.userChoice;
+      setPromptInstalacion(null);
+    } else {
+      // iOS Safari (y otros navegadores que no soportan instalación automática)
+      setMostrarInstruccionesIOS(true);
+    }
+  }
+
+  // --- WhatsApp del negocio (para "Consultar sobre mi turno") ---
+  const [whatsappNegocio, setWhatsappNegocio] = useState("");
+  useEffect(() => {
+    async function cargarConfig() {
+      try {
+        const config = await sb("configuracion?select=whatsapp&id=eq.1");
+        if (config[0]?.whatsapp) setWhatsappNegocio(config[0].whatsapp);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    cargarConfig();
+  }, []);
+
+  function consultarPorWhatsapp() {
+    const numero = (whatsappNegocio || "").replace(/\D/g, "");
+    if (!numero) {
+      alert("No pudimos encontrar el WhatsApp del salón. Probá de nuevo más tarde.");
+      return;
+    }
+    const mensaje = `Hola! Quería consultar sobre mi turno del ${fechaTexto || ""} a las ${horario || ""} hs (a nombre de ${nombre} ${apellido}).`;
+    window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`, "_blank");
+  }
+
   // Catálogo real (categorías + servicios) traído de Supabase.
   // Arranca con el catálogo estático como respaldo por si tarda la conexión.
   const [catalogo, setCatalogo] = useState(CATEGORIAS_APLANADAS);
@@ -703,6 +752,10 @@ export default function PiensaEnRosaReserva() {
     : "";
 
   return (
+    <>
+    <Head>
+      <title>Piensa en Rosa</title>
+    </Head>
     <div
       style={{
         minHeight: "100vh",
@@ -1022,8 +1075,15 @@ export default function PiensaEnRosaReserva() {
               </ul>
               <div style={{ marginTop: 8, color: COLORS.dorado, fontWeight: 700 }}>Total: {formatearPrecio(total)}</div>
             </div>
-            <BotonPrincipal style={{ marginBottom: 10 }}>🩷 Agregar Piensa en Rosa a mi pantalla de inicio</BotonPrincipal>
+            <BotonPrincipal style={{ marginBottom: 10 }} onClick={instalarApp}>🩷 Agregar Piensa en Rosa a mi pantalla de inicio</BotonPrincipal>
+            {mostrarInstruccionesIOS && (
+              <div style={{ textAlign: "left", background: COLORS.advertencia, border: `1px solid ${COLORS.advertenciaBorde}`, borderRadius: 14, padding: 14, fontSize: 12.5, marginBottom: 12, lineHeight: 1.6 }}>
+                Para agregarla a tu pantalla de inicio: tocá el botón <strong>Compartir</strong> (el cuadradito con la flecha hacia arriba) de tu navegador, y elegí <strong>"Agregar a pantalla de inicio"</strong>.
+                <button onClick={() => setMostrarInstruccionesIOS(false)} style={{ display: "block", marginTop: 8, background: "none", border: "none", color: COLORS.rosaIntenso, fontSize: 12, cursor: "pointer", textDecoration: "underline", padding: 0 }}>Entendido</button>
+              </div>
+            )}
             <button
+              onClick={consultarPorWhatsapp}
               style={{
                 width: "100%", padding: "13px 20px", borderRadius: 999, border: `1.5px solid ${COLORS.rosaIntenso}`,
                 background: "#fff", color: COLORS.rosaIntenso, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 16,
@@ -1041,5 +1101,6 @@ export default function PiensaEnRosaReserva() {
         )}
       </div>
     </div>
+    </>
   );
 }
