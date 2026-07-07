@@ -234,14 +234,31 @@ function Modal({ children, onClose, maxWidth = 400 }) {
 
 /* ---------------- Login ---------------- */
 function Login({ onIngresar }) {
-  const [usuario, setUsuario] = useState("");
+  const [email, setEmail] = useState("");
   const [clave, setClave] = useState("");
-  const [recordar, setRecordar] = useState(true);
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false);
 
-  function ingresar() {
-    if (!usuario.trim() || !clave.trim()) { setError("Ingresá usuario y contraseña."); return; }
-    onIngresar();
+  async function ingresar() {
+    if (!email.trim() || !clave.trim()) { setError("Ingresá tu usuario y contraseña."); return; }
+    setError(""); setCargando(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password: clave }),
+      });
+      const datos = await res.json();
+      if (!res.ok) {
+        setError("Usuario o contraseña incorrectos.");
+        setCargando(false);
+        return;
+      }
+      onIngresar(datos.access_token);
+    } catch (e) {
+      setError("No pudimos conectar. Revisá tu internet e intentá de nuevo.");
+    }
+    setCargando(false);
   }
 
   return (
@@ -254,19 +271,15 @@ function Login({ onIngresar }) {
           <div style={{ fontFamily: "Georgia, serif", fontSize: 22, color: C.texto, fontWeight: 600 }}>Piensa en Rosa</div>
           <div style={{ fontSize: 11, letterSpacing: 2, color: C.dorado, marginTop: 4, fontWeight: 700 }}>PANEL DE ADMINISTRACIÓN</div>
         </div>
-        <label style={{ fontSize: 11, color: C.textoSuave, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Usuario</label>
-        <input value={usuario} onChange={(e) => setUsuario(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ingresar()} placeholder="daiana"
+        <label style={{ fontSize: 11, color: C.textoSuave, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Usuario (email)</label>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ingresar()} placeholder="daiana@piensaenrosa.com" autoCapitalize="none"
           style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1px solid ${C.borde}`, marginBottom: 14, fontSize: 14, boxSizing: "border-box", background: "#FEFBFA" }} />
         <label style={{ fontSize: 11, color: C.textoSuave, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Contraseña</label>
         <input type="password" value={clave} onChange={(e) => setClave(e.target.value)} onKeyDown={(e) => e.key === "Enter" && ingresar()} placeholder="••••••••"
-          style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1px solid ${C.borde}`, marginBottom: 14, fontSize: 14, boxSizing: "border-box", background: "#FEFBFA" }} />
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, color: C.textoSuave, marginBottom: 18, cursor: "pointer" }}>
-          <input type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)} />
-          Recordar sesión
-        </label>
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1px solid ${C.borde}`, marginBottom: 18, fontSize: 14, boxSizing: "border-box", background: "#FEFBFA" }} />
         {error && <p style={{ color: "#9C4A55", fontSize: 12, marginBottom: 12 }}>{error}</p>}
-        <button onClick={ingresar} style={{ width: "100%", padding: "13px 20px", borderRadius: 999, border: "none", background: C.rosaIntenso, color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-          Ingresar
+        <button onClick={ingresar} disabled={cargando} style={{ width: "100%", padding: "13px 20px", borderRadius: 999, border: "none", background: C.rosaIntenso, color: "#fff", fontSize: 15, fontWeight: 600, cursor: cargando ? "default" : "pointer", opacity: cargando ? 0.7 : 1 }}>
+          {cargando ? "Ingresando..." : "Ingresar"}
         </button>
       </div>
     </div>
@@ -1295,9 +1308,75 @@ function Mensajes({ mensajes, setMensajes, turnosPorFecha, setTurnosPorFecha }) 
   );
 }
 
-function Configuracion() {
-  const [config, setConfig] = useState({ nombre: "Piensa en Rosa", whatsapp: "11 2345 6789", aliasMP: "piensaenrosa", titular: "Daiana Brito", montoDemora: 3000, montoAusentismo: 15000, costoDesmaquillado: 2000 });
+function Configuracion({ tokenSesion }) {
+  const [config, setConfig] = useState({ nombre: "Piensa en Rosa", whatsapp: "", aliasMP: "piensaenrosa", titular: "Daiana Brito", montoDemora: 3000, montoAusentismo: 15000, costoDesmaquillado: 2000 });
   const [guardado, setGuardado] = useState(false);
+  const [cargando, setCargando] = useState(true);
+
+  const [claveNueva, setClaveNueva] = useState("");
+  const [claveNuevaRepetida, setClaveNuevaRepetida] = useState("");
+  const [mensajeCuenta, setMensajeCuenta] = useState("");
+  const [guardandoCuenta, setGuardandoCuenta] = useState(false);
+
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const datos = await sb("configuracion?select=*&id=eq.1");
+        if (datos[0]) {
+          setConfig({
+            nombre: datos[0].nombre ?? "Piensa en Rosa",
+            whatsapp: datos[0].whatsapp ?? "",
+            aliasMP: datos[0].alias_mp ?? "",
+            titular: datos[0].titular ?? "",
+            montoDemora: datos[0].monto_demora ?? 3000,
+            montoAusentismo: datos[0].monto_ausentismo ?? 15000,
+            costoDesmaquillado: datos[0].costo_desmaquillado ?? 2000,
+          });
+        }
+      } catch (e) { console.error(e); }
+      setCargando(false);
+    }
+    cargar();
+  }, []);
+
+  async function guardar() {
+    setGuardado(true); setTimeout(() => setGuardado(false), 1800);
+    try {
+      await sb("configuracion?id=eq.1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          nombre: config.nombre,
+          whatsapp: config.whatsapp,
+          alias_mp: config.aliasMP,
+          titular: config.titular,
+          monto_demora: Number(config.montoDemora) || 0,
+          monto_ausentismo: Number(config.montoAusentismo) || 0,
+          costo_desmaquillado: Number(config.costoDesmaquillado) || 0,
+        }),
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  async function cambiarClave() {
+    setMensajeCuenta("");
+    if (claveNueva.length < 6) { setMensajeCuenta("La contraseña nueva debe tener al menos 6 caracteres."); return; }
+    if (claveNueva !== claveNuevaRepetida) { setMensajeCuenta("Las dos contraseñas no coinciden."); return; }
+    setGuardandoCuenta(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: "PUT",
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${tokenSesion}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ password: claveNueva }),
+      });
+      if (!res.ok) throw new Error("No se pudo actualizar");
+      setMensajeCuenta("Contraseña actualizada ✓");
+      setClaveNueva(""); setClaveNuevaRepetida("");
+    } catch (e) {
+      setMensajeCuenta("No pudimos cambiar la contraseña. Probá de nuevo.");
+    }
+    setGuardandoCuenta(false);
+  }
+
   function campo(label, key) {
     return (
       <div style={{ marginBottom: 14 }}>
@@ -1309,17 +1388,30 @@ function Configuracion() {
   return (
     <div>
       <h1 style={{ fontFamily: "Georgia, serif", fontSize: 24, color: C.texto, marginBottom: 4 }}>Configuración</h1>
-      <p style={{ color: C.textoSuave, fontSize: 13, marginBottom: 20 }}>Estos datos se usan en los mensajes y textos que ven las clientas.</p>
-      <Tarjeta>
+      <p style={{ color: C.textoSuave, fontSize: 13, marginBottom: 20 }}>Estos datos se usan en los mensajes y textos que ven las clientas. El WhatsApp de contacto es el que se usa cuando una clienta toca "Consultar sobre mi turno".</p>
+      <Tarjeta style={{ marginBottom: 18 }}>
         {campo("Nombre del negocio", "nombre")}
-        {campo("WhatsApp de contacto", "whatsapp")}
+        {campo("WhatsApp de contacto (ej: 5491123456789)", "whatsapp")}
         {campo("Alias de Mercado Pago", "aliasMP")}
         {campo("Titular de la cuenta", "titular")}
         {campo("Monto por demora ($)", "montoDemora")}
         {campo("Monto por ausentismo ($)", "montoAusentismo")}
         {campo("Costo por desmaquillado ($)", "costoDesmaquillado")}
-        <button onClick={() => { setGuardado(true); setTimeout(() => setGuardado(false), 1800); }} style={{ width: "100%", padding: "13px", borderRadius: 999, border: "none", background: C.rosaIntenso, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 6 }}>
+        <button onClick={guardar} style={{ width: "100%", padding: "13px", borderRadius: 999, border: "none", background: C.rosaIntenso, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 6 }}>
           {guardado ? "Guardado ✓" : "Guardar cambios"}
+        </button>
+      </Tarjeta>
+
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.texto, marginBottom: 4 }}>🔒 Cuenta</div>
+      <p style={{ color: C.textoSuave, fontSize: 13, marginBottom: 14 }}>Cambiá tu contraseña de acceso al panel cuando quieras.</p>
+      <Tarjeta>
+        <label style={{ fontSize: 11, color: C.textoSuave, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Contraseña nueva</label>
+        <input type="password" value={claveNueva} onChange={(e) => setClaveNueva(e.target.value)} placeholder="Mínimo 6 caracteres" style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1px solid ${C.borde}`, marginBottom: 14, fontSize: 14, boxSizing: "border-box", background: "#fff" }} />
+        <label style={{ fontSize: 11, color: C.textoSuave, display: "block", marginBottom: 5, textTransform: "uppercase" }}>Repetir contraseña nueva</label>
+        <input type="password" value={claveNuevaRepetida} onChange={(e) => setClaveNuevaRepetida(e.target.value)} style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1px solid ${C.borde}`, marginBottom: 14, fontSize: 14, boxSizing: "border-box", background: "#fff" }} />
+        {mensajeCuenta && <p style={{ fontSize: 12.5, color: mensajeCuenta.includes("✓") ? "#5FA85C" : "#9C4A55", marginBottom: 12 }}>{mensajeCuenta}</p>}
+        <button onClick={cambiarClave} disabled={guardandoCuenta} style={{ width: "100%", padding: "13px", borderRadius: 999, border: `1px solid ${C.rosaIntenso}`, background: "#fff", color: C.rosaIntenso, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          {guardandoCuenta ? "Guardando..." : "Cambiar contraseña"}
         </button>
       </Tarjeta>
     </div>
@@ -1331,6 +1423,7 @@ function Configuracion() {
 --------------------------------------------------------- */
 export default function PanelAdministracion() {
   const [sesionIniciada, setSesionIniciada] = useState(false);
+  const [tokenSesion, setTokenSesion] = useState(null);
   const [seccion, setSeccion] = useState("dashboard");
   const [sidebarAbierta, setSidebarAbierta] = useState(true);
 
@@ -1409,14 +1502,14 @@ export default function PanelAdministracion() {
     cargarTodo();
   }, [sesionIniciada]);
 
-  if (!sesionIniciada) return <Login onIngresar={() => setSesionIniciada(true)} />;
+  if (!sesionIniciada) return <Login onIngresar={(token) => { setTokenSesion(token); setSesionIniciada(true); }} />;
 
   const titulo = MENU.find((m) => m.id === seccion)?.label || "";
   const turnosHoy = turnosPorFecha[CLAVE_HOY] || [];
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
-      <Sidebar activa={seccion} onCambiar={setSeccion} onSalir={() => setSesionIniciada(false)} abierta={sidebarAbierta} onCerrarMovil={() => setSidebarAbierta(false)} />
+      <Sidebar activa={seccion} onCambiar={setSeccion} onSalir={() => { setSesionIniciada(false); setTokenSesion(null); }} abierta={sidebarAbierta} onCerrarMovil={() => setSidebarAbierta(false)} />
       <div style={{ marginLeft: sidebarAbierta ? 230 : 0, transition: "margin-left .2s ease" }}>
         <div style={{ padding: "16px 24px", borderBottom: `1px solid ${C.borde}`, background: "#fff", display: "flex", alignItems: "center", gap: 14, position: "sticky", top: 0, zIndex: 10 }}>
           <button onClick={() => setSidebarAbierta(!sidebarAbierta)} style={{ background: "none", border: `1px solid ${C.borde}`, borderRadius: 10, width: 36, height: 36, cursor: "pointer", fontSize: 15 }}>☰</button>
@@ -1438,7 +1531,7 @@ export default function PanelAdministracion() {
           {seccion === "observaciones" && <Observaciones clientas={clientas} observaciones={observaciones} setObservaciones={setObservaciones} />}
           {seccion === "recordatorios" && <Recordatorios turnosPorFecha={turnosPorFecha} setTurnosPorFecha={setTurnosPorFecha} />}
           {seccion === "mensajes" && <Mensajes mensajes={mensajes} setMensajes={setMensajes} turnosPorFecha={turnosPorFecha} setTurnosPorFecha={setTurnosPorFecha} />}
-          {seccion === "configuracion" && <Configuracion />}
+          {seccion === "configuracion" && <Configuracion tokenSesion={tokenSesion} />}
         </div>
       </div>
     </div>
