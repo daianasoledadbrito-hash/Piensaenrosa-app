@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import Head from "next/head";
 
 /* ---------------------------------------------------------
    PIENSA EN ROSA — Panel de Administración (prototipo)
@@ -262,6 +263,10 @@ function Login({ onIngresar }) {
   }
 
   return (
+    <>
+    <Head>
+      <title>Piensa en Rosa - Admin</title>
+    </Head>
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ width: "100%", maxWidth: 360, background: C.card, borderRadius: 24, padding: 32, boxShadow: "0 10px 40px rgba(180,120,130,0.15)" }}>
         <div style={{ textAlign: "center", marginBottom: 22 }}>
@@ -283,6 +288,7 @@ function Login({ onIngresar }) {
         </button>
       </div>
     </div>
+    </>
   );
 }
 
@@ -1508,6 +1514,10 @@ export default function PanelAdministracion() {
   const turnosHoy = turnosPorFecha[CLAVE_HOY] || [];
 
   return (
+    <>
+    <Head>
+      <title>Piensa en Rosa - Admin</title>
+    </Head>
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       <Sidebar activa={seccion} onCambiar={setSeccion} onSalir={() => { setSesionIniciada(false); setTokenSesion(null); }} abierta={sidebarAbierta} onCerrarMovil={() => setSidebarAbierta(false)} />
       <div style={{ marginLeft: sidebarAbierta ? 230 : 0, transition: "margin-left .2s ease" }}>
@@ -1535,5 +1545,6 @@ export default function PanelAdministracion() {
         </div>
       </div>
     </div>
+    </>
   );
 }
