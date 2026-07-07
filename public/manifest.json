@@ -1,0 +1,14 @@
+{
+  "name": "Piensa en Rosa",
+  "short_name": "Piensa en Rosa",
+  "description": "Reservá tu turno en Piensa en Rosa By Daiana Brito",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FBF3F0",
+  "theme_color": "#C4506B",
+  "icons": [
+    { "src": "/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
